@@ -27,10 +27,13 @@ def plot_eeg(original_data, reconstructed_data, sampling_rate, title='EEG Data',
 data = pd.read_csv('small_dataset.csv')
 X = data.iloc[:, :-1].values # Last col is the target
 X = X.reshape((X.shape[0], 14, 1920)) # 26880 rows -> 14 channels, 15 secs x 128hz
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 channel_means = X.mean(axis=(0, 2), keepdims=True)
 channel_stds = X.std(axis=(0, 2), keepdims=True)
 X = (X - channel_means) / channel_stds
+X = Tensor(X).to(device)
+
 
 class VQVAE(nn.Module):
     def __init__(self, input_channels, hidden_dims, num_codex_entries):
@@ -76,17 +79,17 @@ input_channels = 14  # Number of EEG channels
 hidden_dims = [32, 64, 240]
 num_codex_entries = 1024  # Codex entries. 256-2048 should be fine. Crank it up if you've some A100s nearby.
 
-X = Tensor(X)
+#X = Tensor(X)
 
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 
-dataset = TensorDataset(X)
+dataset = TensorDataset(X).to(device)
 #dataloader = DataLoader(dataset, batch_size=16, shuffle=True)  # You can try batch if you'd like, but you'll have to modify the training loop a bit
 
-model = VQVAE(input_channels, hidden_dims, num_codex_entries)
+model = VQVAE(input_channels, hidden_dims, num_codex_entries).to(device)
 
-optimizer = optim.Adam(model.parameters(), lr=2e-3)
+optimizer = optim.Adam(model.parameters(), lr=2e-3).to(device)
 reconstruction_loss_fn = nn.MSELoss()
 
 def compute_vq_loss(encoded, quantized):
